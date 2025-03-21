@@ -30,25 +30,33 @@ export function DashboardOverview({ sprints, onSelectSprint }: DashboardOverview
   // Calculate average velocity (completed points per sprint)
   const averageVelocity = sprints.length > 0 ? Math.round(totalCompletedPoints / sprints.length) : 0
 
-  // Prepare data for the velocity chart
-  const velocityData = sprints.map((sprint) => ({
-    sprint: `Sprint ${sprint.sprintNumber}`,
-    completed: sprint.totalBurn,
-    added: sprint.totalAdded,
-    remaining: sprint.dailyRemaining.friday,
-    id: sprint.id,
-  }))
-
-  // Prepare data for the burndown trend chart
-  const burndownTrendData = sprints.map((sprint) => {
-    const efficiency = sprint.startPoint > 0 ? Math.round((sprint.totalBurn / sprint.startPoint) * 100) : 0
-    return {
+  // Prepare data for the velocity chart - sort by sprint number
+  const velocityData = [...sprints]
+    .sort((a, b) => a.sprintNumber - b.sprintNumber)
+    .map((sprint) => ({
       sprint: `Sprint ${sprint.sprintNumber}`,
-      efficiency: efficiency,
-      startPoint: sprint.startPoint,
+      completed: sprint.totalBurn,
+      added: sprint.totalAdded,
+      remaining: sprint.dailyRemaining.friday,
       id: sprint.id,
-    }
-  })
+    }))
+
+  // Prepare data for the burndown trend chart with combined data
+  const burndownTrendData = [...sprints]
+    .sort((a, b) => a.sprintNumber - b.sprintNumber)
+    .map((sprint) => {
+      // Update efficiency calculation to use startPoint + totalAdded as denominator
+      const totalPoints = sprint.startPoint + sprint.totalAdded
+      const efficiency = totalPoints > 0 ? Math.round((sprint.totalBurn / totalPoints) * 100) : 0
+      return {
+        sprint: `Sprint ${sprint.sprintNumber}`,
+        efficiency: efficiency,
+        startPoint: sprint.startPoint,
+        completed: sprint.totalBurn,
+        added: sprint.totalAdded,
+        id: sprint.id,
+      }
+    })
 
   return (
     <div className="space-y-6">
@@ -61,7 +69,10 @@ export function DashboardOverview({ sprints, onSelectSprint }: DashboardOverview
           <CardContent>
             <div className="text-2xl font-bold">{totalCompletedPoints}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {totalCompletedPoints} of {totalStartingPoints} points completed
+              {totalCompletedPoints} of {totalStartingPoints + totalAddedPoints} points completed
+            </p>
+            <p className="text-xs text-muted-foreground">
+              ({totalStartingPoints} starting + {totalAddedPoints} added)
             </p>
           </CardContent>
         </Card>
@@ -199,6 +210,10 @@ export function DashboardOverview({ sprints, onSelectSprint }: DashboardOverview
                   label: "Starting Points",
                   color: "#a78bfa", // Lighter purple color
                 },
+                added: {
+                  label: "Added Points",
+                  color: "#60a5fa", // Lighter blue color
+                },
               }}
               className="h-full"
             >
@@ -239,6 +254,10 @@ export function DashboardOverview({ sprints, onSelectSprint }: DashboardOverview
                               <span className="text-muted-foreground">Starting Points: </span>
                               <span className="font-medium">{payload[1].value}</span>
                             </p>
+                            <p className="text-sm">
+                              <span className="text-muted-foreground">Added Points: </span>
+                              <span className="font-medium">{payload[2].value}</span>
+                            </p>
                             <p className="text-xs text-muted-foreground mt-1">Click to view details</p>
                           </div>
                         )
@@ -255,7 +274,17 @@ export function DashboardOverview({ sprints, onSelectSprint }: DashboardOverview
                     strokeWidth={2}
                     dot={{ stroke: "#fbbf24", strokeWidth: 2, r: 4 }}
                   />
-                  <Bar dataKey="startPoint" yAxisId="right" barSize={20} fill="#a78bfa" />
+
+                  {/* Stacked bar chart with starting points and added points */}
+                  <Bar
+                    dataKey="startPoint"
+                    yAxisId="right"
+                    barSize={30}
+                    fill="#a78bfa"
+                    stackId="a"
+                    name="Starting Points"
+                  />
+                  <Bar dataKey="added" yAxisId="right" barSize={30} fill="#60a5fa" stackId="a" name="Added Points" />
                 </ComposedChart>
               </ResponsiveContainer>
             </ChartContainer>
